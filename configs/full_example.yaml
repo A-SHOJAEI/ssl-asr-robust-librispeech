@@ -1,0 +1,61 @@
+# Example config for real LibriSpeech experiments.
+# Edit paths to point at your prepared manifests.
+
+seed: 1337
+
+device: cuda
+
+data:
+  sample_rate: 16000
+  train_manifest: data/manifests/train-clean-100.jsonl
+  dev_manifest: data/manifests/dev-clean.jsonl
+  test_manifest: data/manifests/test-clean.jsonl
+
+# Optional: additional evaluation sets (e.g., robust variants from scripts/make_noisy_eval.py)
+# eval_sets:
+#   test_other: data/manifests/test-other.jsonl
+#   test_clean_snr0: data/eval_robust/test-clean_musan_snr0.jsonl
+#   test_clean_rir: data/eval_robust/test-clean_rir.jsonl
+
+training:
+  batch_size: 16
+  num_workers: 4
+  grad_accum_steps: 1
+  lr: 3.0e-4
+  weight_decay: 0.01
+  max_steps: 200000
+  log_every: 50
+  save_every: 2000
+
+model:
+  vocab: " abcdefghijklmnopqrstuvwxyz'"
+
+baseline:
+  n_mels: 80
+  d_model: 256
+  n_heads: 4
+  n_layers: 6
+  dropout: 0.1
+  # SpecAugment (typical starting point)
+  time_mask_param: 50
+  freq_mask_param: 15
+  num_time_masks: 2
+  num_freq_masks: 2
+
+wav2vec2:
+  conv_channels: [512, 512, 512, 512, 512, 512, 512]
+  conv_kernel:   [10, 3, 3, 3, 3, 2, 2]
+  conv_stride:   [5, 2, 2, 2, 2, 2, 2]
+  d_model: 768
+  n_heads: 12
+  n_layers: 12
+  dropout: 0.1
+  mask_prob: 0.065
+  mask_length: 10
+  temperature: 0.1
+  num_negatives: 100
+
+augment:
+  musan_dir: data/raw/musan
+  rirs_dir: data/raw/RIRS_NOISES
+  snr_db: [0, 5, 10, 20]

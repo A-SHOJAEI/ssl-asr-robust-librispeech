@@ -1,0 +1,19 @@
+Implemented a standalone repo in `/home/alireza/research-autopilot/generated_projects/ssl-asr-robust-librispeech` matching `_autopilot/project_plan.json`, with:
+
+- Data download + checksum verification: `scripts/download_openslr.py` (sequential downloads, verifies MD5 when available, records SHA256 otherwise; optional safe `--extract`).
+- Data prep + robust eval manifests: `scripts/prepare_librispeech.py`, `scripts/make_noisy_eval.py`.
+- Training (PyTorch) with reproducibility controls:
+  - Baseline **Conformer-CTC** (+ SpecAugment support): `src/ssl_asr/train_asr_baseline.py`, `src/ssl_asr/models/conformer_ctc.py`
+  - SSL pretrain (wav2vec2-style masked contrastive): `src/ssl_asr/pretrain_ssl.py`, `src/ssl_asr/models/wav2vec2.py`
+  - Fine-tune wav2vec2-CTC with MUSAN/RIR augmentation + consistency loss, plus ablation **No consistency loss**: `src/ssl_asr/finetune_asr.py`
+- Evaluation + reporting:
+  - Writes `artifacts/results.json`: `src/ssl_asr/evaluate_asr.py`
+  - Writes `artifacts/report.md`: `scripts/make_report.py`
+- Make targets: `Makefile` includes `setup data train eval report all` and defaults to the fast offline smoke config `configs/smoke.yaml`.
+- Pinned deps: `requirements.txt`
+- Smoke dataset generator: `scripts/make_smoke_data.py` (so `make all` is end-to-end without big downloads)
+- Example real-data config: `configs/full_example.yaml`
+
+Run:
+- `make all` (smoke, fast, offline)
+- For real data: use `scripts/download_openslr.py`, `scripts/prepare_librispeech.py`, `scripts/make_noisy_eval.py`, then `make train CONFIG=configs/full_example.yaml` and `make eval CONFIG=configs/full_example.yaml`.

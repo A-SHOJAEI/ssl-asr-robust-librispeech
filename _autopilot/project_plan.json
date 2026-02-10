@@ -1,0 +1,78 @@
+{
+  "repo_name": "ssl-asr-robust-librispeech",
+  "title": "Noise + Room Robust ASR via Self-Supervised Pretraining and Consistency-Regularized Fine-Tuning (LibriSpeech + MUSAN + RIRS_NOISES)",
+  "one_liner": "Train a wav2vec2-style SSL model on LibriSpeech, then fine-tune for ASR with on-the-fly MUSAN/RIR augmentation and a consistency loss; evaluate clean + controlled noisy/reverberant WER with strong baselines and ablations.",
+  "research_question": "How much robustness to additive noise and reverberation can we get from (1) SSL speech pretraining and (2) consistency-regularized, multi-condition fine-tuning, compared to a strong supervised ASR baseline, under controlled SNR and RT60-like conditions?",
+  "dataset": {
+    "name": "LibriSpeech ASR (SLR12) + MUSAN (SLR17) + RIRS_NOISES (SLR28) (+ optional LibriSpeech LM SLR11)",
+    "urls": [
+      "https://www.openslr.org/resources/12/train-clean-100.tar.gz",
+      "https://www.openslr.org/resources/12/train-clean-360.tar.gz",
+      "https://www.openslr.org/resources/12/train-other-500.tar.gz",
+      "https://www.openslr.org/resources/12/dev-clean.tar.gz",
+      "https://www.openslr.org/resources/12/dev-other.tar.gz",
+      "https://www.openslr.org/resources/12/test-clean.tar.gz",
+      "https://www.openslr.org/resources/12/test-other.tar.gz",
+      "https://www.openslr.org/resources/17/musan.tar.gz",
+      "https://www.openslr.org/resources/28/rirs_noises.zip",
+      "https://www.openslr.org/resources/11/4-gram.arpa.gz"
+    ],
+    "license": "CC BY 4.0 (LibriSpeech, MUSAN) + Apache-2.0 (RIRS_NOISES) + Public Domain (LibriSpeech LM)",
+    "approx_size_gb": 160,
+    "ingestion_notes": "Download sequentially (OpenSLR rate-limits parallel connections). Expect ~60GB compressed / ~125GB+ extracted for LibriSpeech 960h; MUSAN adds ~11GB; RIRS_NOISES adds ~1.3GB; plus optional 4-gram LM ~1.3GB. Build JSON manifests with absolute paths, verify sample rate=16kHz, and create derived evaluation sets by mixing MUSAN noise at fixed SNRs and convolving with RIRs (keep clean test sets untouched)."
+  },
+  "method": {
+    "model": "PyTorch DDP wav2vec2-Base style SSL pretraining (conv feature encoder + Transformer context network + masking + contrastive/quantized targets), then CTC fine-tuning for ASR with on-the-fly MUSAN noise + RIR reverb augmentation and an auxiliary consistency loss (KL/JS) between logits from two independently augmented views of the same utterance.",
+    "baseline": "Supervised Conformer-CTC (log-mel frontend + SpecAugment) trained on the same labeled LibriSpeech split; decode with greedy and (optional) 4-gram LM beam search.",
+    "ablations": [
+      "No SSL: same wav2vec2-CTC architecture trained from random init (supervised only).",
+      "No consistency loss: fine-tune with augmentation only (drop KL/JS term).",
+      "No MUSAN/RIR augmentation during fine-tune (clean-only fine-tune).",
+      "Scale ablation: pretrain on train-clean-100 vs pretrain on full 960h (train-clean-100+360+other-500), keeping fine-tune protocol fixed."
+    ],
+    "metrics": [
+      "WER on LibriSpeech test-clean and test-other (greedy and LM-assisted).",
+      "Robust WER on synthetic noisy/reverberant variants of test-clean/test-other (SNR \u2208 {0,5,10,20} dB; RIR real vs simulated).",
+      "Relative WER reduction vs baseline and vs ablations (with bootstrap CIs over utterances).",
+      "Training efficiency: samples/sec and GPU memory footprint for each training stage."
+    ]
+  },
+  "compute": {
+    "gpus": 2,
+    "expected_hours": 48
+  },
+  "risks": [
+    "Full 960h SSL pretraining may take 4-7 days on 2x3090 depending on batch size/precision; the 48h estimate assumes pretraining on train-clean-100 plus 3-5 fine-tune/baseline/ablation runs.",
+    "Disk pressure: extracted audio + checkpoints + cached features can exceed 300GB if you keep multiple runs; enforce a run-retention policy.",
+    "Reproducibility pitfalls: nondeterminism from CUDA/AMP/DDP and randomized augmentation; must fix seeds, log configs, and snapshot code.",
+    "Evaluation leakage: ensure noisy/reverb test sets are generated only from test audio and never used for training; keep augmentation RNG independent per split.",
+    "Beam-search + LM decoding may require extra dependencies/build steps; keep greedy WER as the always-available metric."
+  ],
+  "execution_steps": [
+    "Create a clean env: `python -m venv .venv && source .venv/bin/activate && pip install -U pip`.",
+    "Install deps (PyTorch + torchaudio + DDP tooling + WER): `pip install torch torchaudio lightning hydra-core jiwer soundfile tqdm rich` (pin versions after first successful run).",
+    "Download data: `python scripts/download_openslr.py --out data/raw --librispeech ls960 --musan --rirs --lm 4gram` (must be single-connection per host).",
+    "Prepare manifests: `python scripts/prepare_librispeech.py --in data/raw --out data/manifests --subset train-clean-100,dev-clean,dev-other,test-clean,test-other` (optional: add train-clean-360,train-other-500 for ls960).",
+    "Generate robust eval sets (no training usage): `python scripts/make_noisy_eval.py --manifests data/manifests --musan data/raw/musan --rirs data/raw/RIRS_NOISES --snrs 0,5,10,20 --out data/eval_robust`.",
+    "Train baseline Conformer-CTC: `python -m train_asr_baseline model=conformer_ctc data=train_clean_100 trainer.devices=2`.",
+    "SSL pretrain wav2vec2: `python -m pretrain_ssl model=wav2vec2_base data=ls_train_clean_100 trainer.devices=2 precision=16`.",
+    "Fine-tune wav2vec2-CTC with augmentation+consistency: `python -m finetune_asr model=wav2vec2_ctc init_from=ssl_ckpt consistency.weight=1.0 augment.musan=true augment.rir=true trainer.devices=2`.",
+    "Run ablations by toggling flags: `consistency.weight=0`, `augment.musan=false augment.rir=false`, and `init_from=null` (no-SSL).",
+    "Evaluate all checkpoints: `python -m evaluate_asr --ckpts runs/**/checkpoints/*.ckpt --sets test_clean,test_other,robust --decode greedy --decode_lm data/raw/lm/4-gram.arpa.gz` and aggregate results into a single table + plots with CIs."
+  ],
+  "generated_at_utc": "2026-02-10 06:40:21 UTC",
+  "hardware": {
+    "cpu_cores": 24,
+    "cpu_threads": 48,
+    "ram_gb": 251.59,
+    "gpu_count": 2,
+    "gpu_names": [
+      "NVIDIA GeForce RTX 3090",
+      "NVIDIA GeForce RTX 3090"
+    ],
+    "gpu_vram_gb": [
+      24.0,
+      24.0
+    ]
+  }
+}

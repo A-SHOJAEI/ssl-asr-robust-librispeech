@@ -1,0 +1,61 @@
+# Fast, offline config for `make all`.
+# Uses a tiny generated dataset (see scripts/make_smoke_data.py).
+
+seed: 1337
+
+device: cpu
+
+data:
+  # For smoke, manifests live under data/smoke/manifests
+  train_manifest: data/smoke/manifests/train.jsonl
+  dev_manifest: data/smoke/manifests/dev.jsonl
+  test_manifest: data/smoke/manifests/test.jsonl
+
+  sample_rate: 16000
+  max_seconds: 2.0
+
+training:
+  batch_size: 4
+  num_workers: 0
+  grad_accum_steps: 1
+  lr: 1.0e-3
+  weight_decay: 0.0
+  max_steps: 30
+  log_every: 10
+  save_every: 30
+
+model:
+  vocab: " abcdefghijklmnopqrstuvwxyz'"
+
+baseline:
+  n_mels: 40
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  dropout: 0.1
+  # Keep SpecAugment off for smoke (tiny synthetic data).
+  time_mask_param: 0
+  freq_mask_param: 0
+  num_time_masks: 0
+  num_freq_masks: 0
+
+wav2vec2:
+  # Small smoke-sized wav2vec2-style model.
+  conv_channels: [64, 128]
+  conv_kernel: [10, 3]
+  conv_stride: [5, 2]
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  dropout: 0.1
+  mask_prob: 0.5
+  mask_length: 4
+  temperature: 0.1
+  num_negatives: 20
+
+augment:
+  musan_dir: ""  # set for real experiments
+  rirs_dir: ""   # set for real experiments
+
+  # Used for smoke only (synthetic noise if no MUSAN dir is provided).
+  snr_db: [5, 10]

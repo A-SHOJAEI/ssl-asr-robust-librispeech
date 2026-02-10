@@ -1,0 +1,116 @@
+{
+  "config": {
+    "seed": 1337,
+    "device": "cpu",
+    "data": {
+      "train_manifest": "data/smoke/manifests/train.jsonl",
+      "dev_manifest": "data/smoke/manifests/dev.jsonl",
+      "test_manifest": "data/smoke/manifests/test.jsonl",
+      "sample_rate": 16000,
+      "max_seconds": 2.0
+    },
+    "training": {
+      "batch_size": 4,
+      "num_workers": 0,
+      "grad_accum_steps": 1,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "max_steps": 30,
+      "log_every": 10,
+      "save_every": 30
+    },
+    "model": {
+      "vocab": " abcdefghijklmnopqrstuvwxyz'"
+    },
+    "baseline": {
+      "n_mels": 40,
+      "d_model": 128,
+      "n_heads": 4,
+      "n_layers": 2,
+      "dropout": 0.1,
+      "time_mask_param": 0,
+      "freq_mask_param": 0,
+      "num_time_masks": 0,
+      "num_freq_masks": 0
+    },
+    "wav2vec2": {
+      "conv_channels": [
+        64,
+        128
+      ],
+      "conv_kernel": [
+        10,
+        3
+      ],
+      "conv_stride": [
+        5,
+        2
+      ],
+      "d_model": 128,
+      "n_heads": 4,
+      "n_layers": 2,
+      "dropout": 0.1,
+      "mask_prob": 0.5,
+      "mask_length": 4,
+      "temperature": 0.1,
+      "num_negatives": 20
+    },
+    "augment": {
+      "musan_dir": "",
+      "rirs_dir": "",
+      "snr_db": [
+        5,
+        10
+      ]
+    }
+  },
+  "sets": {
+    "test": "data/smoke/manifests/test.jsonl"
+  },
+  "experiments": {
+    "baseline": {
+      "ckpt": "runs/smoke_baseline/checkpoints/last.pt",
+      "per_set": {
+        "test": {
+          "wer": 1.0,
+          "wer_ci": {
+            "lo": 1.0,
+            "hi": 1.0
+          },
+          "num_utts": 8,
+          "num_ref_words": 17
+        }
+      }
+    },
+    "finetune": {
+      "ckpt": "runs/smoke_finetune/checkpoints/last.pt",
+      "per_set": {
+        "test": {
+          "wer": 1.0,
+          "wer_ci": {
+            "lo": 1.0,
+            "hi": 1.0
+          },
+          "num_utts": 8,
+          "num_ref_words": 17
+        }
+      }
+    },
+    "ablation_no_consistency": {
+      "ckpt": "runs/smoke_ablation_no_consistency/checkpoints/last.pt",
+      "per_set": {
+        "test": {
+          "wer": 1.0,
+          "wer_ci": {
+            "lo": 1.0,
+            "hi": 1.0
+          },
+          "num_utts": 8,
+          "num_ref_words": 17
+        }
+      }
+    }
+  },
+  "_autopilot_runtime_seconds": 238.25,
+  "_autopilot_ran_at_utc": "2026-02-10 07:00:01 UTC"
+}

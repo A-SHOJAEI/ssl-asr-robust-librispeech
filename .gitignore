@@ -1,0 +1,21 @@
+# venv
+.venv/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# data/artifacts/runs
+/data/
+!/data/README.md
+/artifacts/
+!/artifacts/.gitkeep
+/runs/
+
+# OS
+.DS_Store
